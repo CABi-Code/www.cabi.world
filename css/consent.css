@@ -1,0 +1,45 @@
+/* Стили согласия на обработку данных */
+.consent-text {
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.consent-text p {
+  margin-bottom: 12px;
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+
+.consent-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  user-select: none;
+  text-align: left;
+  margin-bottom: 24px;
+}
+
+.consent-label input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  accent-color: #667eea;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.consent-label span {
+  font-size: 0.95em;
+  color: #555;
+  line-height: 1.5;
+}
+
+.consent-label a {
+  color: #667eea;
+  text-decoration: underline;
+}
+
+.consent-label a:hover {
+  color: #764ba2;
+}

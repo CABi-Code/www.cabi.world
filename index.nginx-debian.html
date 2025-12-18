@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Кабинет всякого - Сообщество майнкрафтеров</title>
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://cabi.world/">
+    <meta property="og:site_name" content="Кабинет всякого">
+    <meta property="og:title" content="Кабинет всякого - Сообщество майнкрафтеров">
+    <meta property="og:description" content="Присоединяйся к нашему сообществу! Телеграм чат для майнкрафтеров и канал с приколами. Строим, выживаем, веселимся вместе!">
+    <meta property="og:image" content="https://cabi.world/og-image.png">
+    <meta name="theme-color" content="#667eea">
+
+    <!-- Подключаем все стили -->
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/header.css">
+    <link rel="stylesheet" href="css/links.css">
+    <link rel="stylesheet" href="css/chat.css">
+    <link rel="stylesheet" href="css/modal.css">
+    <link rel="stylesheet" href="css/consent.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 Кабинет всякого</h1>
+            <p>Добро пожаловать в наше сообщество!</p>
+        </div>
+        
+        <div class="content">
+            <div class="welcome-text">
+                <p>Если ты сюда попал каким-то чудом, то можешь посмотреть все наши приколы! 🎉</p>
+            </div>
+            
+            <div class="links-container">
+                <div class="link-card">
+                    <div class="link-card-content">
+                        <span class="icon">🍙</span>
+                        <h3>Кабинет Майнкрафтеров</h3>
+                        <p>Присоединяйся к нашему телеграм чату майнкрафтеров! Строим, выживаем, веселимся вместе.</p>
+                        <a href="https://t.me/+207PA5Ku5XVjNGNi" class="link-button">Присоединиться</a>
+                    </div>
+                </div>
+                
+                <div class="link-card">
+                    <div class="link-card-content">
+                        <span class="icon">📢</span>
+                        <h3>Просто Каби</h3>
+                        <p>Подписывайся на наш телеграм канал, чтобы следить за всеми приколами и новостями сообщества!</p>
+                        <a href="https://t.me/+wPwETGC1Cj9lMzMy" class="link-button">Подписаться</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="decorative-line"></div>
+            
+            <!-- Общий чат -->
+            <div class="chat-section">
+                <h2 class="chat-title">💬 Общий чат</h2>
+                <div class="chat-container">
+
+                    <!-- Заголовок чата с профилем -->
+                    <div id="chatHeader" class="chat-header">
+                        <div id="guestMode" class="guest-mode">
+                            <span class="guest-label">Гостевой режим</span>
+                            <button id="initProfileBtn" class="init-profile-btn">Создать профиль</button>
+                        </div>
+                        <div id="userMode" class="user-mode" style="display:none;">
+                            <div class="profile-avatar" id="profileAvatar"></div>
+                            <div class="profile-name" id="profileName"></div>
+                            <div class="fingerprint-info">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                                <div class="fingerprint-tooltip" id="fingerprintTooltip"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Сообщения чата (всегда видны) -->
+                    <div id="chatMessages" class="chat-messages">
+                        <div class="chat-empty">Здесь пока нет сообщений. Будь первым! 🚀</div>
+                    </div>
+
+                    <!-- Поле ввода сообщения -->
+                    <div class="chat-input-container" id="chatInputContainer">
+                        <textarea id="chatInput" class="chat-message-input" placeholder="Создай профиль, чтобы писать сообщения..." disabled rows="1"></textarea>
+                        <button id="sendButton" class="chat-send-button" disabled></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Благодарим тебя за интерес к нашему сообществу! 💜</p>
+        </div>
+    </div>
+
+    <!-- Модалка согласия на обработку данных -->
+    <div class="modal-overlay" id="consentModal" style="display:none;">
+        <div class="modal-content">
+            <h3>Создание профиля</h3>
+            <div class="consent-text">
+                <p>Для создания профиля мы соберём техническую информацию о твоём устройстве (браузер, разрешение экрана, часовой пояс и т.д.).</p>
+                <p>Это необходимо для твоей уникальной идентификации без регистрации.</p>
+            </div>
+            <label class="consent-label">
+                <input type="checkbox" id="consentCheckbox">
+                <span>Я согласен на <a href="/privacy.html" target="_blank">обработку данных</a></span>
+            </label>
+            <div class="modal-buttons">
+                <button id="consentCancel" class="modal-btn modal-btn-cancel">Отмена</button>
+                <button id="consentConfirm" class="modal-btn modal-btn-primary" disabled>Продолжить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модалка процесса инициализации -->
+    <div class="modal-overlay" id="initModal" style="display:none;">
+        <div class="modal-content">
+            <h3>Инициализация профиля</h3>
+            <p id="initStatus">Сбор данных устройства...</p>
+        </div>
+    </div>
+
+    <!-- Модалка ввода имени -->
+    <div class="modal-overlay" id="nameModal" style="display:none;">
+        <div class="modal-content">
+            <h3>Придумай себе имя</h3>
+            <input type="text" id="nameInput" class="modal-input" maxlength="20" placeholder="Твоё имя" autofocus>
+            <div class="modal-buttons">
+                <button id="nameSaveBtn" class="modal-btn modal-btn-primary">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модалка редактирования сообщения -->
+    <div class="modal-overlay" id="editModal" style="display:none;">
+        <div class="modal-content">
+            <h3>Редактировать сообщение</h3>
+            <textarea id="editInput" class="modal-input" maxlength="200" rows="3"></textarea>
+            <div class="modal-buttons">
+                <button id="editCancel" class="modal-btn modal-btn-cancel">Отмена</button>
+                <button id="editSave" class="modal-btn modal-btn-primary">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/script.js"></script>
+</body>
+</html>
