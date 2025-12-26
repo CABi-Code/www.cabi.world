@@ -7,6 +7,7 @@ let currentPage = 0;
 let loading = false;
 let hasMore = true;
 let lastTimestamp = 0;
+let chatActivated = false;
 
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
@@ -18,6 +19,7 @@ const editSave = document.getElementById('editSave');
 const editCancel = document.getElementById('editCancel');
 
 let editingMessageId = null;
+let updateInterval = null;
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -34,6 +36,7 @@ function createMessageElement(msg) {
     const div = document.createElement('div');
     div.className = 'chat-message';
     div.dataset.messageId = msg.id;
+    div.dataset.hash = msg.hash; // Сохраняем hash в элементе
     
     const avatarLetter = (msg.name || 'А')[0].toUpperCase();
     const isOwn = msg.hash === userHash;
@@ -67,6 +70,8 @@ function createMessageElement(msg) {
 }
 
 function renderAll() {
+    if (!chatMessages) return;
+    
     chatMessages.innerHTML = '';
     if (allMessages.length === 0) {
         chatMessages.innerHTML = '<div class="chat-empty">Здесь пока нет сообщений. Будь первым! 🚀</div>';
@@ -79,22 +84,20 @@ function renderAll() {
 }
 
 function appendNewMessages(newMsgs) {
-    if (newMsgs.length === 0) return;
+    if (!chatMessages || newMsgs.length === 0) return;
+    
     const fragment = document.createDocumentFragment();
     const shouldScroll = chatMessages.scrollTop + chatMessages.clientHeight >= chatMessages.scrollHeight - 50;
     
     newMsgs.forEach(msg => {
-        // Проверяем, не обновление ли это существующего сообщения
         const existingIndex = allMessages.findIndex(m => m.id === msg.id);
         if (existingIndex !== -1) {
-            // Обновляем существующее
             allMessages[existingIndex] = msg;
             const existingEl = chatMessages.querySelector(`[data-message-id="${msg.id}"]`);
             if (existingEl) {
                 existingEl.replaceWith(createMessageElement(msg));
             }
         } else {
-            // Добавляем новое
             fragment.appendChild(createMessageElement(msg));
             allMessages.push(msg);
             lastTimestamp = Math.max(lastTimestamp, msg.timestamp);
@@ -106,6 +109,29 @@ function appendNewMessages(newMsgs) {
     }
     
     if (shouldScroll) chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Функция обновления имён в сообщениях
+function updateMessagesName(hash, newName) {
+    console.log('Updating messages name for hash:', hash, 'to:', newName);
+    
+    // Обновляем в массиве
+    allMessages.forEach(msg => {
+        if (msg.hash === hash) {
+            msg.name = newName;
+        }
+    });
+    
+    // Обновляем в DOM
+    if (chatMessages) {
+        const messageElements = chatMessages.querySelectorAll(`[data-hash="${hash}"]`);
+        messageElements.forEach(el => {
+            const nameEl = el.querySelector('.chat-message-name');
+            const avatarEl = el.querySelector('.chat-message-avatar');
+            if (nameEl) nameEl.textContent = newName;
+            if (avatarEl) avatarEl.textContent = newName[0].toUpperCase();
+        });
+    }
 }
 
 async function loadPage(page, prepend = false) {
@@ -147,10 +173,12 @@ async function sendMessage() {
         return;
     }
 
+    if (!chatInput) return;
+    
     const text = chatInput.value.trim();
     if (!text) return;
 
-    sendButton.disabled = true;
+    if (sendButton) sendButton.disabled = true;
 
     try {
         const res = await fetch('/chat/api.php', {
@@ -159,7 +187,7 @@ async function sendMessage() {
             body: JSON.stringify({
                 name: userProfile.name,
                 text: text,
-                hash: userHash  // Отправляем hash для привязки
+                hash: userHash
             })
         });
 
@@ -177,7 +205,7 @@ async function sendMessage() {
         console.error('Ошибка:', e);
         alert('Не удалось отправить');
     } finally {
-        sendButton.disabled = false;
+        if (sendButton) sendButton.disabled = false;
     }
 }
 
@@ -186,13 +214,15 @@ async function editMessage(messageId) {
     if (!message || message.hash !== userHash) return;
 
     editingMessageId = messageId;
-    editInput.value = message.text;
-    editModal.style.display = 'flex';
-    editInput.focus();
+    if (editInput) editInput.value = message.text;
+    if (editModal) {
+        editModal.style.display = 'flex';
+        if (editInput) editInput.focus();
+    }
 }
 
 async function saveEdit() {
-    if (!editingMessageId) return;
+    if (!editingMessageId || !editInput) return;
 
     const newText = editInput.value.trim();
     if (!newText || newText.length > 200) {
@@ -214,9 +244,8 @@ async function saveEdit() {
         if (res.ok) {
             const json = await res.json();
             if (json.success) {
-                // Обновляем локально
                 appendNewMessages([json.message]);
-                editModal.style.display = 'none';
+                if (editModal) editModal.style.display = 'none';
                 editingMessageId = null;
             }
         } else {
@@ -244,13 +273,14 @@ async function deleteMessage(messageId) {
         if (res.ok) {
             const json = await res.json();
             if (json.success) {
-                // Удаляем локально
                 allMessages = allMessages.filter(m => m.id !== messageId);
-                const el = chatMessages.querySelector(`[data-message-id="${messageId}"]`);
-                if (el) el.remove();
-                
-                if (allMessages.length === 0) {
-                    chatMessages.innerHTML = '<div class="chat-empty">Здесь пока нет сообщений. Будь первым! 🚀</div>';
+                if (chatMessages) {
+                    const el = chatMessages.querySelector(`[data-message-id="${messageId}"]`);
+                    if (el) el.remove();
+                    
+                    if (allMessages.length === 0) {
+                        chatMessages.innerHTML = '<div class="chat-empty">Здесь пока нет сообщений. Будь первым! 🚀</div>';
+                    }
                 }
             }
         } else {
@@ -263,66 +293,107 @@ async function deleteMessage(messageId) {
 }
 
 function autoResizeTextarea() {
+    if (!chatInput) return;
     chatInput.style.height = 'auto';
     chatInput.style.height = Math.min(chatInput.scrollHeight, 150) + 'px';
 }
 
 function activateChat() {
+    if (chatActivated) return;
+    chatActivated = true;
+    
+    console.log('Activating chat...');
+    
     // Загружаем первую страницу
     loadPage(1);
 
     // Обработчики отправки
-    sendButton.addEventListener('click', sendMessage);
+    if (sendButton) {
+        sendButton.addEventListener('click', sendMessage);
+    }
     
-    chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
+    if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
 
-    chatInput.addEventListener('input', autoResizeTextarea);
+        chatInput.addEventListener('input', autoResizeTextarea);
+    }
 
     // Прокрутка вверх - подгрузка старых
-    chatMessages.addEventListener('scroll', () => {
-        if (chatMessages.scrollTop < 200 && !loading && hasMore) {
-            loadPage(currentPage + 1, true);
-        }
-    });
+    if (chatMessages) {
+        chatMessages.addEventListener('scroll', () => {
+            if (chatMessages.scrollTop < 200 && !loading && hasMore) {
+                loadPage(currentPage + 1, true);
+            }
+        });
+    }
 
     // Обновление каждые 6 секунд
-    setInterval(() => {
+    updateInterval = setInterval(() => {
         if (!loading && currentPage >= 1) loadPage(1);
     }, 6000);
 
     // Делегирование для кнопок действий
-    chatMessages.addEventListener('click', (e) => {
-        const btn = e.target.closest('.message-action-btn');
-        if (!btn) return;
+    if (chatMessages) {
+        chatMessages.addEventListener('click', (e) => {
+            const btn = e.target.closest('.message-action-btn');
+            if (!btn) return;
 
-        const action = btn.dataset.action;
-        const messageId = btn.dataset.id;
+            const action = btn.dataset.action;
+            const messageId = btn.dataset.id;
 
-        if (action === 'edit') {
-            editMessage(messageId);
-        } else if (action === 'delete') {
-            deleteMessage(messageId);
-        }
-    });
+            if (action === 'edit') {
+                editMessage(messageId);
+            } else if (action === 'delete') {
+                deleteMessage(messageId);
+            }
+        });
+    }
 
     // Модалка редактирования
-    editSave.addEventListener('click', saveEdit);
-    editCancel.addEventListener('click', () => {
-        editModal.style.display = 'none';
-        editingMessageId = null;
-    });
+    if (editSave) {
+        editSave.addEventListener('click', saveEdit);
+    }
+    
+    if (editCancel && editModal) {
+        editCancel.addEventListener('click', () => {
+            editModal.style.display = 'none';
+            editingMessageId = null;
+        });
+    }
 
-    editInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            saveEdit();
-        }
-    });
+    if (editInput) {
+        editInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                saveEdit();
+            }
+        });
+    }
 }
 
-export { activateChat, loadPage, appendNewMessages };
+// Загружаем сообщения сразу для всех (гостевой режим)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('Chat module: loading messages for guests');
+        loadPage(1);
+        
+        // Обновление для гостей
+        setInterval(() => {
+            if (!chatActivated && !loading) loadPage(1);
+        }, 6000);
+    });
+} else {
+    console.log('Chat module: loading messages for guests (immediate)');
+    loadPage(1);
+    
+    setInterval(() => {
+        if (!chatActivated && !loading) loadPage(1);
+    }, 6000);
+}
+
+export { activateChat, loadPage, appendNewMessages, updateMessagesName };

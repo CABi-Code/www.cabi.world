@@ -1,12 +1,11 @@
 // Модуль профиля пользователя
 
 import { getFingerprint } from './fingerprint.js';
-import { activateChat } from './chat.js';
+import { activateChat, updateMessagesName } from './chat.js';
 
 let userProfile = null;
 let userHash = null;
 
-const chatHeader = document.getElementById('chatHeader');
 const guestMode = document.getElementById('guestMode');
 const userMode = document.getElementById('userMode');
 const profileAvatar = document.getElementById('profileAvatar');
@@ -28,14 +27,50 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Загрузка профиля с сервера по hash
+async function loadProfileFromServer(hash) {
+    console.log('Loading profile from server:', hash);
+    
+    try {
+        const res = await fetch('/chat/api.php?action=get_profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hash: hash })
+        });
+
+        if (!res.ok) throw new Error('Server error: ' + res.status);
+
+        const json = await res.json();
+        console.log('Profile loaded:', json);
+        
+        if (json.success && json.profile) {
+            return json.profile;
+        }
+        
+        return null;
+    } catch (err) {
+        console.error('Error loading profile:', err);
+        return null;
+    }
+}
+
 // Начало процесса инициализации (вызывается после согласия)
 async function startIdentification() {
+    console.log('Starting identification...');
+    
+    if (!initModal || !initStatus) {
+        console.error('Init modal elements not found');
+        return;
+    }
+    
     initModal.style.display = 'flex';
     initStatus.textContent = 'Сбор данных устройства...';
 
     try {
         const fpData = await getFingerprint();
         userHash = fpData.hash;
+        
+        console.log('Fingerprint collected:', userHash);
 
         initStatus.textContent = 'Отправка на сервер...';
 
@@ -45,13 +80,15 @@ async function startIdentification() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 hash: userHash,
-                data: fpData  // Здесь НЕТ имени
+                data: fpData
             })
         });
 
         if (!res.ok) throw new Error('Ошибка сервера: ' + res.status);
 
         const json = await res.json();
+        console.log('Server response:', json);
+        
         if (!json.success || !json.profile) throw new Error('Некорректный ответ');
 
         userProfile = json.profile;
@@ -60,13 +97,15 @@ async function startIdentification() {
         initModal.style.display = 'none';
 
         // Открываем модалку ввода имени
-        nameModal.style.display = 'flex';
-        nameInput.value = userProfile.name || '';
-        nameInput.focus();
+        if (nameModal && nameInput) {
+            nameModal.style.display = 'flex';
+            nameInput.value = userProfile.name || '';
+            nameInput.focus();
+        }
 
     } catch (err) {
+        console.error('Identification error:', err);
         initStatus.textContent = 'Ошибка: ' + err.message;
-        console.error(err);
         setTimeout(() => {
             initModal.style.display = 'none';
         }, 2000);
@@ -75,6 +114,8 @@ async function startIdentification() {
 
 // Сохранение имени
 async function saveName() {
+    if (!nameInput) return;
+    
     const newName = nameInput.value.trim();
     if (!newName || newName.length > 20) {
         alert('Имя должно быть от 1 до 20 символов');
@@ -92,6 +133,7 @@ async function saveName() {
 
         const json = await res.json();
         if (json.success) {
+            const oldName = userProfile.name;
             userProfile.name = newName;
             localStorage.setItem('profileHash', userHash);
             localStorage.setItem('chatUsername', newName);
@@ -100,9 +142,14 @@ async function saveName() {
             updateProfileUI();
 
             // Закрываем модалку
-            nameModal.style.display = 'none';
+            if (nameModal) nameModal.style.display = 'none';
 
-            // Активируем чат
+            // Обновляем имена в сообщениях чата
+            if (oldName !== newName) {
+                updateMessagesName(userHash, newName);
+            }
+
+            // Активируем чат (если ещё не активирован)
             activateChat();
         }
     } catch (e) {
@@ -113,14 +160,14 @@ async function saveName() {
 
 // Обновление UI профиля
 function updateProfileUI() {
-    guestMode.style.display = 'none';
-    userMode.style.display = 'flex';
+    if (guestMode) guestMode.style.display = 'none';
+    if (userMode) userMode.style.display = 'flex';
     
-    profileAvatar.textContent = userProfile.name[0].toUpperCase();
-    profileNameEl.textContent = userProfile.name;
+    if (profileAvatar) profileAvatar.textContent = userProfile.name[0].toUpperCase();
+    if (profileNameEl) profileNameEl.textContent = userProfile.name;
 
     // Tooltip с fingerprint
-    if (userProfile.fingerprint) {
+    if (userProfile.fingerprint && fingerprintTooltip) {
         const list = Object.entries(userProfile.fingerprint)
             .filter(([k]) => k !== 'hash')
             .map(([k, v]) => {
@@ -132,46 +179,87 @@ function updateProfileUI() {
     }
 
     // Разблокируем ввод
-    chatInput.disabled = false;
-    sendButton.disabled = false;
-    chatInput.placeholder = 'Напиши сообщение...';
+    if (chatInput) {
+        chatInput.disabled = false;
+        chatInput.placeholder = 'Напиши сообщение...';
+    }
+    if (sendButton) sendButton.disabled = false;
 }
 
 // Инициализация модуля
-function initProfileModule() {
+async function initProfileModule() {
+    console.log('Profile module initializing...');
+    
     // Слушаем событие согласия
-    document.addEventListener('consentGiven', startIdentification);
+    document.addEventListener('consentGiven', () => {
+        console.log('Consent given event received');
+        startIdentification();
+    });
 
     // Кнопка сохранения имени
-    nameSaveBtn.addEventListener('click', saveName);
+    if (nameSaveBtn) {
+        nameSaveBtn.addEventListener('click', saveName);
+    }
 
     // Enter в поле имени
-    nameInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') saveName();
-    });
+    if (nameInput) {
+        nameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') saveName();
+        });
+    }
 
     // Клик по имени - открытие модалки смены имени
-    profileNameEl.addEventListener('click', () => {
-        if (!userProfile) return;
-        nameInput.value = userProfile.name || '';
-        nameModal.style.display = 'flex';
-        nameInput.focus();
-    });
+    if (profileNameEl && nameModal && nameInput) {
+        profileNameEl.addEventListener('click', () => {
+            if (!userProfile) return;
+            nameInput.value = userProfile.name || '';
+            nameModal.style.display = 'flex';
+            nameInput.focus();
+        });
+    }
 
-    // Проверяем, есть ли сохранённый профиль
+    // Проверяем, есть ли сохранённый hash в localStorage
     const savedHash = localStorage.getItem('profileHash');
-    const savedName = localStorage.getItem('chatUsername');
 
-    if (savedHash && savedName) {
-        // Восстанавливаем профиль
-        userHash = savedHash;
-        userProfile = { name: savedName };
-        updateProfileUI();
-        activateChat();
+    if (savedHash) {
+        console.log('Found saved hash, loading from server:', savedHash);
+        
+        // Сначала собираем fingerprint чтобы проверить совпадение
+        const fpData = await getFingerprint();
+        const currentHash = fpData.hash;
+        
+        console.log('Current hash:', currentHash);
+        console.log('Saved hash:', savedHash);
+        
+        // Если hash совпадает - загружаем профиль с сервера
+        if (currentHash === savedHash) {
+            const profile = await loadProfileFromServer(savedHash);
+            
+            if (profile) {
+                userHash = savedHash;
+                userProfile = profile;
+                updateProfileUI();
+                activateChat();
+                console.log('Profile restored from server');
+            } else {
+                console.log('Profile not found on server, clearing localStorage');
+                localStorage.removeItem('profileHash');
+                localStorage.removeItem('chatUsername');
+            }
+        } else {
+            console.log('Hash mismatch, device changed. Clearing localStorage');
+            localStorage.removeItem('profileHash');
+            localStorage.removeItem('chatUsername');
+        }
     }
 }
 
-document.addEventListener('DOMContentLoaded', initProfileModule);
+// Ждём загрузки DOM
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initProfileModule);
+} else {
+    initProfileModule();
+}
 
 // Экспортируем для использования в других модулях
 export { userProfile, userHash };

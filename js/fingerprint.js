@@ -1,4 +1,4 @@
-// сбор отпечатка
+// Сбор отпечатка устройства (МИНИМАЛЬНЫЙ набор)
 
 async function murmurHash3(key) {
     let i = 0;
@@ -22,19 +22,22 @@ async function murmurHash3(key) {
 }
 
 export async function getFingerprint() {
-const data = {};
+    const data = {};
 
+    // Базовые данные браузера
     data.userAgent = navigator.userAgent;
     data.language = navigator.language;
     data.languages = navigator.languages ? navigator.languages.join(',') : '';
     data.timezone = new Date().getTimezoneOffset();
-    data.screen = `${screen.width}x${screen.height},${screen.availWidth}x${screen.availHeight},${screen.colorDepth},${screen.pixelDepth}`;
-    data.touch = navigator.maxTouchPoints || ('ontouchstart' in window ? 1 : 0);
+    
+    // ТОЛЬКО глубина цвета (24, 32 и т.д.)
+    data.colorDepth = screen.colorDepth;
+    
     data.doNotTrack = navigator.doNotTrack;
     data.platform = navigator.platform;
     data.cores = navigator.hardwareConcurrency || 0;
 
-    // Canvas
+    // Canvas fingerprint
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     ctx.textBaseline = 'top';
@@ -42,10 +45,10 @@ const data = {};
     ctx.fillStyle = '#f60';
     ctx.fillRect(125, 1, 62, 20);
     ctx.fillStyle = '#069';
-    ctx.fillText('🙂 Canvas test', 2, 15);
+    ctx.fillText('Canvas FP', 2, 15);
     data.canvas = canvas.toDataURL();
 
-    // WebGL
+    // WebGL fingerprint
     try {
         const glCanvas = document.createElement('canvas');
         const gl = glCanvas.getContext('webgl') || glCanvas.getContext('experimental-webgl');
@@ -58,7 +61,7 @@ const data = {};
         data.webglVendor = data.webglRenderer = 'error';
     }
 
-    // Audio
+    // Audio fingerprint
     try {
         const AudioContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
         const context = new AudioContext(1, 5000, 44100);
@@ -78,8 +81,9 @@ const data = {};
         data.audio = 'error';
     }
 
-    // Fonts
-    const fonts = ['Arial', 'Courier New', 'Georgia', 'Times New Roman', 'Verdana', 'Comic Sans MS', 'Impact', 'Trebuchet MS', 'Helvetica', 'Tahoma'];
+    // Список установленных шрифтов
+    const fonts = ['Arial', 'Courier New', 'Georgia', 'Times New Roman', 'Verdana', 
+                   'Comic Sans MS', 'Impact', 'Trebuchet MS', 'Helvetica', 'Tahoma'];
     const span = document.createElement('span');
     span.innerHTML = 'mmmmmmmmmmlli';
     span.style.fontSize = '100px';
@@ -93,8 +97,8 @@ const data = {};
     }).join(',');
     document.body.removeChild(span);
 
-	const strForHash = Object.entries(data)
-        .filter(([key]) => key !== 'name')  // исключаем имя
+    // Создаём хэш из ВСЕХ данных
+    const strForHash = Object.entries(data)
         .map(([, value]) => value)
         .join('|||');
     data.hash = await murmurHash3(strForHash);
